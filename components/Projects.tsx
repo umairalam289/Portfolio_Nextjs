@@ -122,7 +122,7 @@ export default function Projects() {
         >
           <div>
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/45">
-              05 / Selected work
+              07 / Selected work
             </div>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
               Things I&apos;ve <span className="gradient-text">built</span>.

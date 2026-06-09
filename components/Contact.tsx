@@ -33,7 +33,7 @@ export default function Contact() {
           >
             <div>
               <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/45">
-                06 / Contact
+                08 / Contact
               </div>
               <h2 className="mt-3 font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
                 Got a vision <br />

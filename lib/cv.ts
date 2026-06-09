@@ -54,6 +54,16 @@ export const projects = [
     cta: "Open interactive demo",
   },
   {
+    title: "Retinal Vessel Segmentation — U-Net",
+    blurb:
+      "Semantic segmentation of retinal blood vessels from fundus photographs using a U-Net with a ResNet-34 backbone, producing precise binary vessel maps for ophthalmology screening. Live demo above — drag to compare input against prediction.",
+    role: "Solo project",
+    tags: ["U-Net", "ResNet-34", "Segmentation", "Ophthalmology"],
+    accent: "from-cyan-400 to-violet-400",
+    href: "#retina",
+    cta: "Open interactive demo",
+  },
+  {
     title: "Personalized Dental AI Chatbot",
     blurb:
       "Agentic chatbot built on LangGraph with RAG over clinical and patient context, delivering grounded, personalized dental assistance.",

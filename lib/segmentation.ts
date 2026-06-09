@@ -83,6 +83,9 @@ export const CLASS_COLORS: Record<string, string> = {
   Crown: "#fbbf24",
   Filling: "#34d399",
   Rct: "#fb7185",
+  "Rct +Post": "#e11d48",
+  Impaction: "#c084fc",
+  "Periapical Radiolucency": "#38bdf8",
   // Tooth structures
   Enamel: "#22d3ee",
   Bone: "#f59e0b",
@@ -132,6 +135,9 @@ const PRETTY: Record<string, string> = {
   Crown: "Crown",
   Filling: "Filling",
   Rct: "Root canal treatment",
+  "Rct +Post": "Root canal + post",
+  Impaction: "Impaction",
+  "Periapical Radiolucency": "Periapical radiolucency",
   Enamel: "Enamel",
   Bone: "Bone",
   InterRadicular_Bone: "Inter-radicular bone",
@@ -162,3 +168,78 @@ export function centroid(points: Point[]) {
   }
   return { x: sx / points.length, y: sy / points.length };
 }
+
+// ---------------------------------------------------------------------------
+// Demo configuration — the segmentation canvas is driven entirely by one of
+// these, so the periapical and OPG demos share a single rendering engine.
+// ---------------------------------------------------------------------------
+
+export type DemoLayerConfig = { key: LayerKey; defaultOn: boolean };
+
+export type DemoConfig = {
+  /** DOM id / anchor target for the section. */
+  id: string;
+  /** Small mono eyebrow, e.g. "04 / Live demo". */
+  eyebrow: string;
+  /** Heading split so the accent word can be gradient-filled. */
+  titlePre: string;
+  titleAccent: string;
+  titlePost: string;
+  description: string;
+  imageSrc: string;
+  imageAlt: string;
+  dataUrl: string;
+  /** Used until the JSON loads (keeps the aspect box stable). */
+  fallbackWidth: number;
+  fallbackHeight: number;
+  /** Shown in the window chrome, e.g. "periapical". */
+  imageTypeLabel: string;
+  modelLabel: string;
+  /** Hex colour for the scroll scan-line + glow. */
+  scanColor: string;
+  /** Layers available in this demo, in display order, with default state. */
+  layers: DemoLayerConfig[];
+};
+
+export const PERIAPICAL_DEMO: DemoConfig = {
+  id: "segmentation",
+  eyebrow: "04 / Live demo",
+  titlePre: "Periapical X-ray, ",
+  titleAccent: "decoded",
+  titlePost: ".",
+  description:
+    "Real model output from the dental segmentation pipeline I built at ZIGRON, rendered live on a real radiograph. Toggle layers, hover regions, and scroll to watch a scan-line trace the model's view of the mouth — tooth by tooth.",
+  imageSrc: "/dental-xray.jpg",
+  imageAlt: "Periapical dental X-ray",
+  dataUrl: "/segmentation.json",
+  fallbackWidth: 1336,
+  fallbackHeight: 1030,
+  imageTypeLabel: "periapical",
+  modelLabel: "YOLO v8 segmentation",
+  scanColor: "#22d3ee",
+  layers: [
+    { key: "tooth_numbering", defaultOn: true },
+    { key: "diagnostic", defaultOn: true },
+    { key: "tooth_structure", defaultOn: false },
+    { key: "bone_loss", defaultOn: false },
+  ],
+};
+
+export const OPG_DEMO: DemoConfig = {
+  id: "segmentation-opg",
+  eyebrow: "05 / Live demo",
+  titlePre: "Panoramic OPG, ",
+  titleAccent: "diagnosed",
+  titlePost: ".",
+  description:
+    "The same pipeline on a full-mouth panoramic radiograph — isolated here to the diagnostic layer: crowns, fillings, root canals, posts, impactions and periapical pathology the model flags across the entire arch. Scroll to reveal each finding as the scan-line sweeps the jaw.",
+  imageSrc: "/opg-xray.jpg",
+  imageAlt: "Panoramic OPG dental X-ray",
+  dataUrl: "/opg-segmentation.json",
+  fallbackWidth: 1040,
+  fallbackHeight: 519,
+  imageTypeLabel: "panoramic OPG",
+  modelLabel: "YOLO v8 segmentation",
+  scanColor: "#e879f9",
+  layers: [{ key: "diagnostic", defaultOn: true }],
+};

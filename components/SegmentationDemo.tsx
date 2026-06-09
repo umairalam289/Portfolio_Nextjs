@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useMotionValueEvent,
+} from "framer-motion";
 import {
   LAYER_META,
+  type DemoConfig,
   type LayerKey,
   type MaskItem,
   type Prediction,
@@ -27,50 +33,80 @@ type HoverInfo =
   | { kind: "bone"; idx: number; cx: number; cy: number; loss: boolean; distance: number }
   | null;
 
-const LAYER_ORDER: LayerKey[] = [
-  "tooth_numbering",
-  "tooth_structure",
-  "diagnostic",
-  "bone_loss",
-];
+// A mask is revealed once the scroll-driven scan-line has swept past its
+// centroid. A small lead lets the region light up just as the line crosses it.
+const REVEAL_LEAD = 0.02;
 
-export default function SegmentationDemo() {
+export default function SegmentationDemo({ config }: { config: DemoConfig }) {
   const [data, setData] = useState<Prediction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
-    tooth_numbering: true,
-    tooth_structure: false,
-    diagnostic: true,
-    bone_loss: false,
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>(() => {
+    const base: Record<LayerKey, boolean> = {
+      tooth_numbering: false,
+      tooth_structure: false,
+      diagnostic: false,
+      bone_loss: false,
+    };
+    for (const l of config.layers) base[l.key] = l.defaultOn;
+    return base;
   });
   const [hover, setHover] = useState<HoverInfo>(null);
-  const [revealed, setRevealed] = useState(false);
+  const [scan, setScan] = useState(0); // 0 → 1 scroll-driven reveal position
   const [showLabels, setShowLabels] = useState(true);
   const [opacity, setOpacity] = useState(0.55);
 
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLDivElement>(null);
+
+  // Which layers this demo actually renders, in configured order.
+  const renderLayers = useMemo(
+    () => config.layers.filter((l) => l.key !== "bone_loss").map((l) => l.key),
+    [config]
+  );
+  const hasBoneLoss = useMemo(
+    () => config.layers.some((l) => l.key === "bone_loss"),
+    [config]
+  );
+  const multiLayer = config.layers.length > 1;
 
   useEffect(() => {
-    fetch("/segmentation.json")
-      .then((r) => r.json())
+    let cancelled = false;
+    setData(null);
+    setError(null);
+    fetch(config.dataUrl)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((j: SegmentationResponse) => {
         const p = j?.response?.predictions?.[0];
-        if (!p) throw new Error("No predictions");
-        setData(p);
+        if (!p) throw new Error("No predictions in response");
+        if (!cancelled) setData(p);
       })
-      .catch((e) => setError(String(e)));
-  }, []);
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config.dataUrl]);
 
+  // Scroll-scrubbed reveal: progress runs 0→1 as the image rises through the
+  // viewport, driving both the scan-line and which masks are visible.
+  const { scrollYProgress } = useScroll({
+    target: imageRef,
+    offset: ["start 0.85", "start 0.32"],
+  });
+  useMotionValueEvent(scrollYProgress, "change", (v) => {
+    // Quantise to ~200 steps so we re-render at most that often per sweep.
+    setScan(Math.round(Math.min(1, Math.max(0, v)) * 200) / 200);
+  });
+  // Pick up the initial position in case the section is already in view.
   useEffect(() => {
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setRevealed(true);
-      },
-      { threshold: 0.3 }
+    const raf = requestAnimationFrame(() =>
+      setScan(Math.round(Math.min(1, Math.max(0, scrollYProgress.get())) * 200) / 200)
     );
-    if (wrapRef.current) obs.observe(wrapRef.current);
-    return () => obs.disconnect();
-  }, []);
+    return () => cancelAnimationFrame(raf);
+  }, [scrollYProgress]);
 
   const counts = useMemo(() => {
     if (!data) return null;
@@ -82,32 +118,25 @@ export default function SegmentationDemo() {
     };
   }, [data]);
 
-  const w = data?.imageWidth ?? 1336;
-  const h = data?.imageHeight ?? 1030;
+  const w = data?.imageWidth ?? config.fallbackWidth;
+  const h = data?.imageHeight ?? config.fallbackHeight;
+
+  const activeLayers = config.layers.filter((l) => layers[l.key]).length;
+  const scanVisible = scan > 0.015 && scan < 0.99;
 
   function toggleLayer(k: LayerKey) {
     setLayers((s) => ({ ...s, [k]: !s[k] }));
   }
-
-  function showAll() {
-    setLayers({
-      tooth_numbering: true,
-      tooth_structure: true,
-      diagnostic: true,
-      bone_loss: true,
-    });
-  }
-  function hideAll() {
-    setLayers({
-      tooth_numbering: false,
-      tooth_structure: false,
-      diagnostic: false,
-      bone_loss: false,
+  function setAll(on: boolean) {
+    setLayers((s) => {
+      const next = { ...s };
+      for (const l of config.layers) next[l.key] = on;
+      return next;
     });
   }
 
   return (
-    <section id="segmentation" className="relative px-6 py-32 sm:px-10">
+    <section id={config.id} className="relative px-6 py-32 sm:px-10">
       <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -118,40 +147,36 @@ export default function SegmentationDemo() {
         >
           <div>
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/45">
-              04 / Live demo
+              {config.eyebrow}
             </div>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Periapical X-ray, <span className="gradient-text">decoded</span>.
+              {config.titlePre}
+              <span className="gradient-text">{config.titleAccent}</span>
+              {config.titlePost}
             </h2>
-            <p className="mt-4 max-w-2xl text-white/65">
-              Real model output from the dental segmentation pipeline I built at
-              ZIGRON, rendered live on a real radiograph. Toggle layers, hover
-              regions, and watch the model&apos;s view of the mouth come together.
-            </p>
+            <p className="mt-4 max-w-2xl text-white/65">{config.description}</p>
           </div>
 
           {counts && (
             <div className="flex flex-wrap gap-2 font-mono text-[11px] text-white/70">
-              {(["tooth_numbering", "diagnostic", "tooth_structure", "bone_loss"] as LayerKey[]).map(
-                (k) => (
+              {config.layers.map(({ key: k }) => (
+                <span
+                  key={k}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1"
+                  style={{ borderColor: `${LAYER_META[k].color}33` }}
+                >
                   <span
-                    key={k}
-                    className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1"
-                    style={{ borderColor: `${LAYER_META[k].color}33` }}
-                  >
-                    <span
-                      className="mr-1.5 inline-block h-2 w-2 rounded-full"
-                      style={{ background: LAYER_META[k].color }}
-                    />
-                    {counts[k]} {LAYER_META[k].label.toLowerCase()}
-                  </span>
-                )
-              )}
+                    className="mr-1.5 inline-block h-2 w-2 rounded-full"
+                    style={{ background: LAYER_META[k].color }}
+                  />
+                  {counts[k]} {LAYER_META[k].label.toLowerCase()}
+                </span>
+              ))}
             </div>
           )}
         </motion.div>
 
-        <div ref={wrapRef} className="grid gap-6 lg:grid-cols-12">
+        <div className="grid gap-6 lg:grid-cols-12">
           {/* Image + overlays */}
           <div className="lg:col-span-8">
             <div className="glass relative overflow-hidden rounded-3xl">
@@ -163,45 +188,44 @@ export default function SegmentationDemo() {
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
                   </span>
                   <span className="text-white/45">
-                    periapical · {w}×{h}px · YOLO v8 segmentation
+                    {config.imageTypeLabel} · {w}×{h}px · {config.modelLabel}
                   </span>
                 </div>
                 <span className="hidden sm:inline text-white/35">
-                  {Object.values(layers).filter(Boolean).length} / 4 layers active
+                  {activeLayers} / {config.layers.length} layer
+                  {config.layers.length === 1 ? "" : "s"} active
                 </span>
               </div>
 
               <div
-                className="relative aspect-[1336/1030] w-full select-none"
+                ref={imageRef}
+                className="relative w-full select-none"
+                style={{ aspectRatio: `${w} / ${h}` }}
                 onMouseLeave={() => setHover(null)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/dental-xray.jpg"
-                  alt="Periapical dental X-ray"
+                  src={config.imageSrc}
+                  alt={config.imageAlt}
                   className="absolute inset-0 h-full w-full object-cover"
                   style={{
                     filter: "contrast(1.08) brightness(1.04) saturate(0.9)",
                   }}
                 />
 
-                {/* image scan effect on first reveal */}
-                <AnimatePresence>
-                  {revealed && (
-                    <motion.div
-                      initial={{ y: "-100%", opacity: 1 }}
-                      animate={{ y: "100%", opacity: 1 }}
-                      transition={{ duration: 1.4, ease: "easeInOut" }}
-                      exit={{ opacity: 0 }}
-                      className="pointer-events-none absolute inset-x-0 h-24"
-                      style={{
-                        background:
-                          "linear-gradient(180deg, transparent, rgba(34,211,238,0.4), transparent)",
-                        boxShadow: "0 0 60px rgba(34,211,238,0.5)",
-                      }}
-                    />
-                  )}
-                </AnimatePresence>
+                {/* scroll-driven scan line */}
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-10 h-24 -translate-y-1/2 transition-opacity duration-300"
+                  style={{
+                    top: `${scan * 100}%`,
+                    opacity: scanVisible ? 1 : 0,
+                    background: `linear-gradient(180deg, transparent, ${withAlpha(
+                      config.scanColor,
+                      0.45
+                    )}, transparent)`,
+                    boxShadow: `0 0 60px ${withAlpha(config.scanColor, 0.5)}`,
+                  }}
+                />
 
                 <svg
                   viewBox={`0 0 ${w} ${h}`}
@@ -220,119 +244,122 @@ export default function SegmentationDemo() {
                   </defs>
 
                   {data &&
-                    LAYER_ORDER.filter((l) => l !== "bone_loss" && layers[l]).map((layer) => {
-                      const items = data[layer] as MaskItem[];
-                      return (
-                        <g key={layer} pointerEvents="auto">
-                          {items.map((item, idx) => {
-                            const path = pointsToPath(item.mask_points, w, h);
-                            const c = centroid(item.mask_points);
-                            const isHovered =
-                              hover?.kind === "mask" &&
-                              hover.layer === layer &&
-                              hover.item === item;
-                            const color = colorForItem(layer, item, idx);
-                            return (
-                              <g key={`${layer}-${idx}`}>
-                                <motion.path
-                                  d={path}
-                                  initial={{ opacity: 0 }}
-                                  animate={{
-                                    opacity: revealed ? (isHovered ? 0.95 : opacity) : 0,
-                                  }}
-                                  transition={{
-                                    duration: 0.6,
-                                    delay: 0.1 + idx * 0.04,
-                                    ease: [0.22, 1, 0.36, 1],
-                                  }}
-                                  fill={color}
-                                  fillOpacity={isHovered ? 0.5 : 0.28}
-                                  stroke={color}
-                                  strokeWidth={isHovered ? 3 : 1.6}
-                                  strokeLinejoin="round"
-                                  style={{
-                                    filter: isHovered ? "url(#softglow)" : "none",
-                                    cursor: "pointer",
-                                    transition: "fill-opacity 200ms, stroke-width 200ms",
-                                  }}
-                                  onMouseEnter={() =>
-                                    setHover({
-                                      kind: "mask",
-                                      layer,
-                                      item,
-                                      color,
-                                      cx: c.x * w,
-                                      cy: c.y * h,
-                                    })
-                                  }
-                                />
-                                {showLabels && layer === "tooth_numbering" && (
-                                  <motion.g
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: revealed ? 1 : 0 }}
-                                    transition={{ delay: 0.6 + idx * 0.05 }}
-                                    pointerEvents="none"
-                                  >
-                                    <circle
-                                      cx={c.x * w}
-                                      cy={c.y * h}
-                                      r={22}
-                                      fill="rgba(5,6,10,0.78)"
-                                      stroke={color}
-                                      strokeWidth={2}
-                                    />
-                                    <text
-                                      x={c.x * w}
-                                      y={c.y * h + 5}
-                                      textAnchor="middle"
-                                      fontSize="20"
-                                      fontWeight="700"
-                                      fontFamily="var(--font-space), system-ui"
-                                      fill={color}
+                    renderLayers
+                      .filter((l) => layers[l])
+                      .map((layer) => {
+                        const items = data[layer] as MaskItem[];
+                        return (
+                          <g key={layer} pointerEvents="auto">
+                            {items.map((item, idx) => {
+                              const path = pointsToPath(item.mask_points, w, h);
+                              const c = centroid(item.mask_points);
+                              const revealed = scan >= c.y - REVEAL_LEAD;
+                              const isHovered =
+                                hover?.kind === "mask" &&
+                                hover.layer === layer &&
+                                hover.item === item;
+                              const color = colorForItem(layer, item, idx);
+                              return (
+                                <g key={`${layer}-${idx}`}>
+                                  <motion.path
+                                    d={path}
+                                    initial={false}
+                                    animate={{
+                                      opacity: revealed ? (isHovered ? 0.95 : opacity) : 0,
+                                    }}
+                                    transition={{
+                                      duration: 0.5,
+                                      ease: [0.22, 1, 0.36, 1],
+                                    }}
+                                    fill={color}
+                                    fillOpacity={isHovered ? 0.5 : 0.28}
+                                    stroke={color}
+                                    strokeWidth={isHovered ? 3 : 1.6}
+                                    strokeLinejoin="round"
+                                    style={{
+                                      filter: isHovered ? "url(#softglow)" : "none",
+                                      cursor: "pointer",
+                                      pointerEvents: revealed ? "auto" : "none",
+                                      transition: "fill-opacity 200ms, stroke-width 200ms",
+                                    }}
+                                    onMouseEnter={() =>
+                                      setHover({
+                                        kind: "mask",
+                                        layer,
+                                        item,
+                                        color,
+                                        cx: c.x * w,
+                                        cy: c.y * h,
+                                      })
+                                    }
+                                  />
+                                  {showLabels && layer === "tooth_numbering" && (
+                                    <motion.g
+                                      initial={false}
+                                      animate={{ opacity: revealed ? 1 : 0 }}
+                                      transition={{ duration: 0.4 }}
+                                      pointerEvents="none"
                                     >
-                                      {item.concerned_area.toString().replace("tooth_", "T")}
-                                    </text>
-                                  </motion.g>
-                                )}
-                                {showLabels && layer === "diagnostic" && (
-                                  <motion.g
-                                    initial={{ opacity: 0, y: -4 }}
-                                    animate={{ opacity: revealed ? 1 : 0, y: 0 }}
-                                    transition={{ delay: 0.7 + idx * 0.05 }}
-                                    pointerEvents="none"
-                                  >
-                                    <rect
-                                      x={c.x * w - 64}
-                                      y={c.y * h - 38}
-                                      width={128}
-                                      height={28}
-                                      rx={14}
-                                      fill="rgba(5,6,10,0.82)"
-                                      stroke={color}
-                                      strokeWidth={1.2}
-                                    />
-                                    <text
-                                      x={c.x * w}
-                                      y={c.y * h - 19}
-                                      textAnchor="middle"
-                                      fontSize="14"
-                                      fontWeight="600"
-                                      fontFamily="var(--font-space), system-ui"
-                                      fill={color}
+                                      <circle
+                                        cx={c.x * w}
+                                        cy={c.y * h}
+                                        r={22}
+                                        fill="rgba(5,6,10,0.78)"
+                                        stroke={color}
+                                        strokeWidth={2}
+                                      />
+                                      <text
+                                        x={c.x * w}
+                                        y={c.y * h + 5}
+                                        textAnchor="middle"
+                                        fontSize="20"
+                                        fontWeight="700"
+                                        fontFamily="var(--font-space), system-ui"
+                                        fill={color}
+                                      >
+                                        {item.concerned_area.toString().replace("tooth_", "T")}
+                                      </text>
+                                    </motion.g>
+                                  )}
+                                  {showLabels && layer === "diagnostic" && (
+                                    <motion.g
+                                      initial={false}
+                                      animate={{ opacity: revealed ? 1 : 0 }}
+                                      transition={{ duration: 0.4 }}
+                                      pointerEvents="none"
                                     >
-                                      {prettyClass(item.class_name)}
-                                    </text>
-                                  </motion.g>
-                                )}
-                              </g>
-                            );
-                          })}
-                        </g>
-                      );
-                    })}
+                                      <rect
+                                        x={c.x * w - 64}
+                                        y={c.y * h - 38}
+                                        width={128}
+                                        height={28}
+                                        rx={14}
+                                        fill="rgba(5,6,10,0.82)"
+                                        stroke={color}
+                                        strokeWidth={1.2}
+                                      />
+                                      <text
+                                        x={c.x * w}
+                                        y={c.y * h - 19}
+                                        textAnchor="middle"
+                                        fontSize="14"
+                                        fontWeight="600"
+                                        fontFamily="var(--font-space), system-ui"
+                                        fill={color}
+                                      >
+                                        {prettyClass(item.class_name)}
+                                      </text>
+                                    </motion.g>
+                                  )}
+                                </g>
+                              );
+                            })}
+                          </g>
+                        );
+                      })}
 
                   {/* bone-loss landmarks */}
-                  {data && layers.bone_loss && (
+                  {data && hasBoneLoss && layers.bone_loss && (
                     <g>
                       {data.bone_loss.map((b, i) => {
                         const ex = b.cej_bone_pair.enamel_point.x * w;
@@ -343,12 +370,18 @@ export default function SegmentationDemo() {
                         const lossColor = b.boneloss ? "#fb7185" : c;
                         const cx = (ex + bx) / 2;
                         const cy = (ey + by) / 2;
+                        const midY = (b.cej_bone_pair.enamel_point.y + b.cej_bone_pair.bone_point.y) / 2;
+                        const revealed = scan >= midY - REVEAL_LEAD;
                         return (
                           <motion.g
                             key={i}
-                            initial={{ opacity: 0 }}
+                            initial={false}
                             animate={{ opacity: revealed ? 1 : 0 }}
-                            transition={{ delay: 0.8 + i * 0.06 }}
+                            transition={{ duration: 0.4 }}
+                            style={{
+                              cursor: "pointer",
+                              pointerEvents: revealed ? "auto" : "none",
+                            }}
                             onMouseEnter={() =>
                               setHover({
                                 kind: "bone",
@@ -359,7 +392,6 @@ export default function SegmentationDemo() {
                                 distance: b.distance,
                               })
                             }
-                            style={{ cursor: "pointer" }}
                           >
                             <line
                               x1={ex}
@@ -474,7 +506,7 @@ export default function SegmentationDemo() {
 
               {/* footer hint */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 bg-black/20 px-4 py-3 font-mono text-[11px] text-white/45">
-                <span>Hover any region for class & confidence.</span>
+                <span>Scroll to reveal · hover any region for class &amp; confidence.</span>
                 <span className="hidden sm:inline">
                   Mask points are normalized — scaled to {w}×{h}.
                 </span>
@@ -487,96 +519,92 @@ export default function SegmentationDemo() {
             <div className="glass space-y-5 rounded-3xl p-5">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-semibold tracking-tight">Layers</h3>
-                <div className="flex gap-1.5 font-mono text-[10px]">
-                  <button
-                    onClick={showAll}
-                    data-cursor="hover"
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70 hover:bg-white/[0.1]"
-                  >
-                    all
-                  </button>
-                  <button
-                    onClick={hideAll}
-                    data-cursor="hover"
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70 hover:bg-white/[0.1]"
-                  >
-                    none
-                  </button>
-                </div>
+                {multiLayer && (
+                  <div className="flex gap-1.5 font-mono text-[10px]">
+                    <button
+                      onClick={() => setAll(true)}
+                      data-cursor="hover"
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70 hover:bg-white/[0.1]"
+                    >
+                      all
+                    </button>
+                    <button
+                      onClick={() => setAll(false)}
+                      data-cursor="hover"
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70 hover:bg-white/[0.1]"
+                    >
+                      none
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                {(["tooth_numbering", "diagnostic", "tooth_structure", "bone_loss"] as LayerKey[]).map(
-                  (k) => {
-                    const meta = LAYER_META[k];
-                    const on = layers[k];
-                    const count = counts ? counts[k] : 0;
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => toggleLayer(k)}
-                        data-cursor="hover"
-                        className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
-                          on
-                            ? "border-white/15 bg-white/[0.05]"
-                            : "border-white/5 bg-white/[0.015] hover:bg-white/[0.04]"
+                {config.layers.map(({ key: k }) => {
+                  const meta = LAYER_META[k];
+                  const on = layers[k];
+                  const count = counts ? counts[k] : 0;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => toggleLayer(k)}
+                      data-cursor="hover"
+                      className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
+                        on
+                          ? "border-white/15 bg-white/[0.05]"
+                          : "border-white/5 bg-white/[0.015] hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span
+                        className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-transform ${
+                          on ? "scale-100" : "scale-95 opacity-60"
                         }`}
+                        style={{
+                          background: `${meta.color}15`,
+                          boxShadow: on
+                            ? `0 0 0 1px ${meta.color}55, 0 0 20px ${meta.color}40`
+                            : `inset 0 0 0 1px rgba(255,255,255,0.06)`,
+                        }}
                       >
                         <span
-                          className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-transform ${
-                            on ? "scale-100" : "scale-95 opacity-60"
-                          }`}
-                          style={{
-                            background: `${meta.color}15`,
-                            boxShadow: on
-                              ? `0 0 0 1px ${meta.color}55, 0 0 20px ${meta.color}40`
-                              : `inset 0 0 0 1px rgba(255,255,255,0.06)`,
-                          }}
-                        >
+                          className="h-2 w-2 rounded-full"
+                          style={{ background: meta.color }}
+                        />
+                        {on && (
                           <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ background: meta.color }}
+                            className="absolute inset-0 rounded-xl animate-pulse-soft"
+                            style={{
+                              background: `radial-gradient(circle, ${meta.color}30, transparent 70%)`,
+                            }}
                           />
-                          {on && (
-                            <span
-                              className="absolute inset-0 rounded-xl animate-pulse-soft"
-                              style={{
-                                background: `radial-gradient(circle, ${meta.color}30, transparent 70%)`,
-                              }}
-                            />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center justify-between">
-                            <span className="font-display text-sm font-medium text-white">
-                              {meta.label}
-                            </span>
-                            <span className="font-mono text-[10px] text-white/45">
-                              {count}
-                            </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between">
+                          <span className="font-display text-sm font-medium text-white">
+                            {meta.label}
                           </span>
-                          <span className="block text-[11px] text-white/55">
-                            {meta.sub}
+                          <span className="font-mono text-[10px] text-white/45">
+                            {count}
                           </span>
                         </span>
+                        <span className="block text-[11px] text-white/55">{meta.sub}</span>
+                      </span>
+                      <span
+                        className={`ml-1 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+                          on ? "" : "bg-white/10"
+                        }`}
+                        style={{ background: on ? meta.color : undefined }}
+                      >
                         <span
-                          className={`ml-1 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
-                            on ? "" : "bg-white/10"
+                          className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                            on ? "translate-x-4" : "translate-x-0"
                           }`}
-                          style={{
-                            background: on ? meta.color : undefined,
-                          }}
-                        >
-                          <span
-                            className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                              on ? "translate-x-4" : "translate-x-0"
-                            }`}
-                          />
-                        </span>
-                      </button>
-                    );
-                  }
-                )}
+                        />
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
@@ -618,50 +646,59 @@ export default function SegmentationDemo() {
               {data && (
                 <div className="space-y-3">
                   {/* per-class color legend */}
-                  {(["diagnostic", "tooth_structure"] as LayerKey[]).map((lk) => {
-                    if (!layers[lk]) return null;
-                    const seen = new Map<string, string>();
-                    (data[lk] as MaskItem[]).forEach((it, idx) => {
-                      if (!seen.has(it.class_name))
-                        seen.set(it.class_name, colorForItem(lk, it, idx));
-                    });
-                    if (!seen.size) return null;
-                    return (
-                      <div
-                        key={lk}
-                        className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
-                      >
-                        <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
-                          {LAYER_META[lk].label} legend
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Array.from(seen.entries()).map(([name, color]) => (
-                            <span
-                              key={name}
-                              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-white/80"
-                              style={{ borderColor: withAlpha(color, 0.45) }}
-                            >
+                  {(["diagnostic", "tooth_structure"] as LayerKey[])
+                    .filter((lk) => renderLayers.includes(lk))
+                    .map((lk) => {
+                      if (!layers[lk]) return null;
+                      const seen = new Map<string, string>();
+                      (data[lk] as MaskItem[]).forEach((it, idx) => {
+                        if (!seen.has(it.class_name))
+                          seen.set(it.class_name, colorForItem(lk, it, idx));
+                      });
+                      if (!seen.size) return null;
+                      return (
+                        <div
+                          key={lk}
+                          className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
+                        >
+                          <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
+                            {LAYER_META[lk].label} legend
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.from(seen.entries()).map(([name, color]) => (
                               <span
-                                className="h-2 w-2 rounded-full"
-                                style={{
-                                  background: color,
-                                  boxShadow: `0 0 8px ${withAlpha(color, 0.7)}`,
-                                }}
-                              />
-                              {prettyClass(name)}
-                            </span>
-                          ))}
+                                key={name}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-white/80"
+                                style={{ borderColor: withAlpha(color, 0.45) }}
+                              >
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{
+                                    background: color,
+                                    boxShadow: `0 0 8px ${withAlpha(color, 0.7)}`,
+                                  }}
+                                />
+                                {prettyClass(name)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
 
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-[11px] leading-relaxed text-white/65">
                     <div className="mb-1 text-[9px] uppercase tracking-[0.22em] text-white/40">
                       metadata
                     </div>
-                    <div>image_type: <span className="text-white">{data.ImageType}</span></div>
-                    <div>resolution: <span className="text-white">{w}×{h}</span></div>
+                    <div>
+                      image_type: <span className="text-white">{data.ImageType}</span>
+                    </div>
+                    <div>
+                      resolution:{" "}
+                      <span className="text-white">
+                        {w}×{h}
+                      </span>
+                    </div>
                     {data.key_findings?.[0] && (
                       <div className="mt-2">
                         procedures:{" "}

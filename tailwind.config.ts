@@ -9,53 +9,42 @@ const config: Config = {
     extend: {
       colors: {
         ink: {
-          950: "#05060a",
-          900: "#0a0c14",
-          800: "#10131f",
-          700: "#171b2b",
+          950: "#06080c",
+          900: "#0a0e15",
+          800: "#0e131c",
+          700: "#161c28",
         },
         accent: {
-          cyan: "#22d3ee",
-          violet: "#a78bfa",
-          fuchsia: "#e879f9",
-          mint: "#5eead4",
+          DEFAULT: "#22d3ee",
+          soft: "#67e8f9",
+          deep: "#0e7490",
         },
+        alert: "#fb7185",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-space)", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       animation: {
-        "blob-slow": "blob 22s ease-in-out infinite",
-        "blob-medium": "blob 16s ease-in-out infinite",
-        "blob-fast": "blob 12s ease-in-out infinite",
-        "shimmer": "shimmer 3s linear infinite",
+        "drift-slow": "drift 26s ease-in-out infinite",
+        "drift-medium": "drift 20s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
         "pulse-soft": "pulseSoft 4s ease-in-out infinite",
       },
       keyframes: {
-        blob: {
+        drift: {
           "0%, 100%": { transform: "translate(0px, 0px) scale(1)" },
-          "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-          "66%": { transform: "translate(-20px, 20px) scale(0.95)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% center" },
-          "100%": { backgroundPosition: "200% center" },
+          "50%": { transform: "translate(24px, -36px) scale(1.06)" },
         },
         float: {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
         pulseSoft: {
-          "0%, 100%": { opacity: "0.6" },
+          "0%, 100%": { opacity: "0.55" },
           "50%": { opacity: "1" },
         },
-      },
-      backgroundImage: {
-        "grid-fade":
-          "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 1px, transparent 1px)",
       },
     },
   },

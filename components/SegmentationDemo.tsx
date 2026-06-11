@@ -54,8 +54,17 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
   const [scan, setScan] = useState(0); // 0 → 1 scroll-driven reveal position
   const [showLabels, setShowLabels] = useState(true);
   const [opacity, setOpacity] = useState(0.55);
+  // Once the visitor touches a control, masks stop waiting on the scan-line and
+  // simply appear — so a toggle never produces a dead, invisible no-op.
+  const [controlled, setControlled] = useState(false);
+  // Touch devices have no hover; we switch to tap-to-select and adapt the copy.
+  const [coarse, setCoarse] = useState(false);
 
   const imageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCoarse(window.matchMedia("(hover: none)").matches);
+  }, []);
 
   // Which layers this demo actually renders, in configured order.
   const renderLayers = useMemo(
@@ -125,9 +134,11 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
   const scanVisible = scan > 0.015 && scan < 0.99;
 
   function toggleLayer(k: LayerKey) {
+    setControlled(true);
     setLayers((s) => ({ ...s, [k]: !s[k] }));
   }
   function setAll(on: boolean) {
+    setControlled(true);
     setLayers((s) => {
       const next = { ...s };
       for (const l of config.layers) next[l.key] = on;
@@ -146,15 +157,13 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
           className="mb-10 flex flex-wrap items-end justify-between gap-6"
         >
           <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/45">
-              {config.eyebrow}
-            </div>
+            <div className="eyebrow">{config.eyebrow}</div>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
               {config.titlePre}
-              <span className="gradient-text">{config.titleAccent}</span>
+              <span className="accent-text">{config.titleAccent}</span>
               {config.titlePost}
             </h2>
-            <p className="mt-4 max-w-2xl text-white/65">{config.description}</p>
+            <p className="mt-4 max-w-2xl leading-relaxed text-white/70">{config.description}</p>
           </div>
 
           {counts && (
@@ -179,19 +188,22 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Image + overlays */}
           <div className="lg:col-span-8">
-            <div className="glass relative overflow-hidden rounded-3xl">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-black/20 px-4 py-3 font-mono text-[11px] text-white/55">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex gap-1">
-                    <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300/70" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+            <div className="panel-solid relative overflow-hidden rounded-3xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 bg-black/30 px-4 py-3 font-mono text-[11px] text-white/55">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1.5 text-accent">
+                    <span className="relative inline-flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+                    </span>
+                    LIVE
                   </span>
-                  <span className="text-white/45">
+                  <span className="text-white/30">/</span>
+                  <span className="text-white/55">
                     {config.imageTypeLabel} · {w}×{h}px · {config.modelLabel}
                   </span>
                 </div>
-                <span className="hidden sm:inline text-white/35">
+                <span className="hidden sm:inline text-white/40">
                   {activeLayers} / {config.layers.length} layer
                   {config.layers.length === 1 ? "" : "s"} active
                 </span>
@@ -253,7 +265,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                             {items.map((item, idx) => {
                               const path = pointsToPath(item.mask_points, w, h);
                               const c = centroid(item.mask_points);
-                              const revealed = scan >= c.y - REVEAL_LEAD;
+                              const revealed = controlled || scan >= c.y - REVEAL_LEAD;
                               const isHovered =
                                 hover?.kind === "mask" &&
                                 hover.layer === layer &&
@@ -292,6 +304,20 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                                         cy: c.y * h,
                                       })
                                     }
+                                    onClick={() =>
+                                      setHover((prev) =>
+                                        prev?.kind === "mask" && prev.item === item
+                                          ? null
+                                          : {
+                                              kind: "mask",
+                                              layer,
+                                              item,
+                                              color,
+                                              cx: c.x * w,
+                                              cy: c.y * h,
+                                            }
+                                      )
+                                    }
                                   />
                                   {showLabels && layer === "tooth_numbering" && (
                                     <motion.g
@@ -314,7 +340,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                                         textAnchor="middle"
                                         fontSize="20"
                                         fontWeight="700"
-                                        fontFamily="var(--font-space), system-ui"
+                                        fontFamily="var(--font-mono), ui-monospace, monospace"
                                         fill={color}
                                       >
                                         {item.concerned_area.toString().replace("tooth_", "T")}
@@ -344,7 +370,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                                         textAnchor="middle"
                                         fontSize="14"
                                         fontWeight="600"
-                                        fontFamily="var(--font-space), system-ui"
+                                        fontFamily="var(--font-mono), ui-monospace, monospace"
                                         fill={color}
                                       >
                                         {prettyClass(item.class_name)}
@@ -371,7 +397,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                         const cx = (ex + bx) / 2;
                         const cy = (ey + by) / 2;
                         const midY = (b.cej_bone_pair.enamel_point.y + b.cej_bone_pair.bone_point.y) / 2;
-                        const revealed = scan >= midY - REVEAL_LEAD;
+                        const revealed = controlled || scan >= midY - REVEAL_LEAD;
                         return (
                           <motion.g
                             key={i}
@@ -391,6 +417,20 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                                 loss: b.boneloss,
                                 distance: b.distance,
                               })
+                            }
+                            onClick={() =>
+                              setHover((prev) =>
+                                prev?.kind === "bone" && prev.idx === i
+                                  ? null
+                                  : {
+                                      kind: "bone",
+                                      idx: i,
+                                      cx,
+                                      cy,
+                                      loss: b.boneloss,
+                                      distance: b.distance,
+                                    }
+                              )
                             }
                           >
                             <line
@@ -430,7 +470,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                     >
                       {hover.kind === "mask" ? (
                         <div
-                          className="glass-strong min-w-[210px] rounded-xl px-3.5 py-2.5 text-xs shadow-2xl"
+                          className="glass min-w-[210px] rounded-xl px-3.5 py-2.5 text-xs shadow-2xl"
                           style={{ borderColor: withAlpha(hover.color, 0.45) }}
                         >
                           <div className="flex items-center gap-2">
@@ -466,7 +506,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                           )}
                         </div>
                       ) : (
-                        <div className="glass-strong min-w-[180px] rounded-xl px-3.5 py-2.5 text-xs shadow-2xl">
+                        <div className="glass min-w-[180px] rounded-xl px-3.5 py-2.5 text-xs shadow-2xl">
                           <div className="font-display text-sm font-semibold text-white">
                             CEJ → Bone
                           </div>
@@ -506,7 +546,10 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
 
               {/* footer hint */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 bg-black/20 px-4 py-3 font-mono text-[11px] text-white/45">
-                <span>Scroll to reveal · hover any region for class &amp; confidence.</span>
+                <span>
+                  Scroll to reveal · {coarse ? "tap" : "hover"} any region for class &amp;
+                  confidence.
+                </span>
                 <span className="hidden sm:inline">
                   Mask points are normalized — scaled to {w}×{h}.
                 </span>
@@ -516,7 +559,7 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
 
           {/* Controls */}
           <aside className="lg:col-span-4">
-            <div className="glass space-y-5 rounded-3xl p-5">
+            <div className="panel space-y-5 rounded-3xl p-5">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-semibold tracking-tight">Layers</h3>
                 {multiLayer && (
@@ -620,18 +663,22 @@ export default function SegmentationDemo({ config }: { config: DemoConfig }) {
                   max={0.9}
                   step={0.05}
                   value={opacity}
-                  onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                  className="w-full accent-violet-400"
+                  onChange={(e) => {
+                    setControlled(true);
+                    setOpacity(parseFloat(e.target.value));
+                  }}
+                  className="w-full accent-accent"
                 />
                 <label className="flex items-center justify-between gap-3 pt-1 text-xs text-white/65">
                   <span>Inline labels</span>
                   <button
-                    onClick={() => setShowLabels((v) => !v)}
+                    onClick={() => {
+                      setControlled(true);
+                      setShowLabels((v) => !v);
+                    }}
                     data-cursor="hover"
                     className={`inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
-                      showLabels
-                        ? "bg-gradient-to-r from-cyan-400 to-violet-400"
-                        : "bg-white/10"
+                      showLabels ? "bg-accent" : "bg-white/10"
                     }`}
                   >
                     <span

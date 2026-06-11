@@ -203,7 +203,7 @@ export type DemoConfig = {
 
 export const PERIAPICAL_DEMO: DemoConfig = {
   id: "segmentation",
-  eyebrow: "04 / Live demo",
+  eyebrow: "Live model 01 — Dental segmentation",
   titlePre: "Periapical X-ray, ",
   titleAccent: "decoded",
   titlePost: ".",
@@ -227,7 +227,7 @@ export const PERIAPICAL_DEMO: DemoConfig = {
 
 export const OPG_DEMO: DemoConfig = {
   id: "segmentation-opg",
-  eyebrow: "05 / Live demo",
+  eyebrow: "Live model 02 — Panoramic OPG",
   titlePre: "Panoramic OPG, ",
   titleAccent: "diagnosed",
   titlePost: ".",
@@ -240,6 +240,6 @@ export const OPG_DEMO: DemoConfig = {
   fallbackHeight: 519,
   imageTypeLabel: "panoramic OPG",
   modelLabel: "YOLO v8 segmentation",
-  scanColor: "#e879f9",
+  scanColor: "#22d3ee",
   layers: [{ key: "diagnostic", defaultOn: true }],
 };

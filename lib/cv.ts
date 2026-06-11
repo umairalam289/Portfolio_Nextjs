@@ -42,34 +42,15 @@ export const experience = [
   },
 ];
 
+// The periapical and retina models live above as full interactive demos, so
+// they are intentionally not repeated here — this section is the rest of the work.
 export const projects = [
-  {
-    title: "Dental Diagnosis — Periapical X-Ray Segmentation",
-    blurb:
-      "Multi-class semantic segmentation of teeth, restorations and tooth structures on periapical X-rays. Live demo below — explore the model output overlaid on a real radiograph.",
-    role: "Lead developer",
-    tags: ["YOLO v8", "Segmentation", "Healthcare", "FastAPI"],
-    accent: "from-cyan-400 to-violet-400",
-    href: "#segmentation",
-    cta: "Open interactive demo",
-  },
-  {
-    title: "Retinal Vessel Segmentation — U-Net",
-    blurb:
-      "Semantic segmentation of retinal blood vessels from fundus photographs using a U-Net with a ResNet-34 backbone, producing precise binary vessel maps for ophthalmology screening. Live demo above — drag to compare input against prediction.",
-    role: "Solo project",
-    tags: ["U-Net", "ResNet-34", "Segmentation", "Ophthalmology"],
-    accent: "from-cyan-400 to-violet-400",
-    href: "#retina",
-    cta: "Open interactive demo",
-  },
   {
     title: "Personalized Dental AI Chatbot",
     blurb:
       "Agentic chatbot built on LangGraph with RAG over clinical and patient context, delivering grounded, personalized dental assistance.",
     role: "AI engineer",
     tags: ["LangGraph", "LangChain", "RAG", "LLMs"],
-    accent: "from-violet-400 to-fuchsia-400",
   },
   {
     title: "Bone-Loss Detection Algorithm",
@@ -77,7 +58,6 @@ export const projects = [
       "Post-processing pipeline turning raw segmentation into clinically meaningful CEJ-to-bone measurements for periodontal screening.",
     role: "Algorithm design",
     tags: ["OpenCV", "NumPy", "Geometry"],
-    accent: "from-fuchsia-400 to-cyan-400",
   },
   {
     title: "Brain Tumor Detection — CNN",
@@ -85,25 +65,30 @@ export const projects = [
       "Binary thresholding pre-processing and a CNN classifier on MRI scans, demonstrating end-to-end image preprocessing and deep-learning fundamentals.",
     role: "Solo project",
     tags: ["CNN", "PyTorch", "MRI", "Image Processing"],
-    accent: "from-cyan-400 to-mint-400",
   },
 ];
 
-export const skills = [
-  { label: "Computer Vision", weight: 1 },
-  { label: "PyTorch", weight: 1 },
-  { label: "Deep Learning", weight: 1 },
-  { label: "Large Language Models", weight: 1 },
-  { label: "Prompt Engineering", weight: 0.85 },
-  { label: "Docker", weight: 0.9 },
-  { label: "Retrieval-Augmented Generation", weight: 0.85 },
-  { label: "Flask", weight: 0.7 },
-  { label: "FastAPI", weight: 0.95 },
-  { label: "OpenCV", weight: 0.95 },
-  { label: "Machine Learning", weight: 1 },
-  { label: "CNNs", weight: 1 },
-  { label: "NLP", weight: 0.8 },
-  { label: "Data Science", weight: 0.85 },
+export const skillGroups = [
+  {
+    title: "Computer Vision",
+    note: "Where most of my work lives",
+    items: ["Image Segmentation", "Object Detection", "YOLO v8", "U-Net", "OpenCV", "CNNs", "Medical Imaging"],
+  },
+  {
+    title: "LLMs & Agents",
+    note: "Grounded, tool-using systems",
+    items: ["LangGraph", "LangChain", "RAG", "Prompt Engineering", "NLP", "Chatbots"],
+  },
+  {
+    title: "ML Engineering",
+    note: "From notebook to model",
+    items: ["PyTorch", "Deep Learning", "Model Training", "Post-processing", "CVAT Annotation"],
+  },
+  {
+    title: "Shipping & Data",
+    note: "Models that actually run",
+    items: ["FastAPI", "Flask", "Docker", "REST APIs", "Python", "NumPy", "Pandas"],
+  },
 ];
 
 export const education = [

@@ -3,19 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --bg: #05060a;
-  --bg-2: #0a0c14;
-  --fg: #e6e8ee;
-  --muted: #8b91a7;
-  --line: rgba(255, 255, 255, 0.08);
-  --accent-cyan: #22d3ee;
-  --accent-violet: #a78bfa;
-  --accent-fuchsia: #e879f9;
-  --accent-mint: #5eead4;
+  --bg: #06080c;
+  --bg-2: #0a0e15;
+  --surface: rgba(255, 255, 255, 0.025);
+  --fg: #f1f4f8;
+  --muted: #aab3c2;
+  --faint: #6b7484;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* One signature accent — clinical cyan, the colour of the vessel maps. */
+  --accent: #22d3ee;
+  --accent-soft: #67e8f9;
+  --accent-deep: #0e7490;
+  /* Semantic only: a positive clinical finding / alert. Never decorative. */
+  --alert: #fb7185;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
@@ -27,17 +37,23 @@ body {
   overflow-x: hidden;
 }
 
+/* animatable angle for flowing gradient borders */
+@property --bang {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 body {
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(167, 139, 250, 0.08), transparent 60%),
-    radial-gradient(900px 500px at -10% 30%, rgba(34, 211, 238, 0.08), transparent 60%),
-    radial-gradient(1000px 700px at 50% 110%, rgba(232, 121, 249, 0.06), transparent 60%),
+    radial-gradient(1100px 560px at 78% -8%, rgba(34, 211, 238, 0.10), transparent 62%),
+    radial-gradient(820px 480px at -6% 22%, rgba(34, 211, 238, 0.06), transparent 60%),
     var(--bg);
 }
 
 ::selection {
-  background: rgba(167, 139, 250, 0.35);
-  color: white;
+  background: rgba(34, 211, 238, 0.30);
+  color: #04121a;
 }
 
 ::-webkit-scrollbar {
@@ -48,68 +64,86 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(#1a1f33, #0f1320);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(#22d3ee44, #a78bfa44);
+  background: rgba(34, 211, 238, 0.45);
   background-clip: padding-box;
 }
 
-/* Reusable utilities */
 @layer components {
+  /* Panels read like instrument housings — flat, precise, low-noise. */
+  .panel {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.035),
+      rgba(255, 255, 255, 0.012)
+    );
+    border: 1px solid var(--line);
+  }
+
+  .panel-solid {
+    background: linear-gradient(180deg, #0e131c, #0a0e15);
+    border: 1px solid var(--line);
+  }
+
   .glass {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.04),
-      rgba(255, 255, 255, 0.015)
-    );
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    background: rgba(10, 14, 21, 0.72);
+    backdrop-filter: blur(16px) saturate(130%);
+    -webkit-backdrop-filter: blur(16px) saturate(130%);
     border: 1px solid var(--line);
   }
 
-  .glass-strong {
-    background: linear-gradient(
-      180deg,
-      rgba(20, 24, 40, 0.65),
-      rgba(10, 12, 20, 0.55)
-    );
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid var(--line);
-  }
-
-  .gradient-text {
-    background: linear-gradient(
-      90deg,
-      #22d3ee 0%,
-      #a78bfa 50%,
-      #e879f9 100%
-    );
+  /* Accent text — a tight single-hue cyan with a slow flowing sheen. */
+  .accent-text {
+    background: linear-gradient(100deg, #67e8f9, #22d3ee, #7dd3fc, #22d3ee, #67e8f9);
+    background-size: 220% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    background-size: 200% auto;
+    animation: sheen 9s linear infinite;
   }
 
-  .gradient-border {
+  /* Cursor-reactive glow — placed as a child span so it never clashes with the
+     reticle pseudo-elements. Parent carries data-spot; FX updates --mx/--my. */
+  .spot-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    background: radial-gradient(
+      240px circle at var(--mx, 50%) var(--my, 50%),
+      rgba(34, 211, 238, 0.16),
+      transparent 60%
+    );
+  }
+  [data-spot]:hover .spot-glow {
+    opacity: 1;
+  }
+
+  /* Flowing gradient hairline border — a cyan arc that slowly orbits the panel. */
+  .flow-border {
     position: relative;
     isolation: isolate;
   }
-  .gradient-border::before {
+  .flow-border::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(
-      135deg,
-      rgba(34, 211, 238, 0.5),
-      rgba(167, 139, 250, 0.5),
-      rgba(232, 121, 249, 0.5)
+    background: conic-gradient(
+      from var(--bang),
+      transparent 0%,
+      rgba(34, 211, 238, 0.65) 12%,
+      rgba(125, 211, 252, 0.25) 22%,
+      transparent 38%,
+      transparent 100%
     );
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
@@ -117,55 +151,60 @@ body {
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
-    z-index: -1;
+    z-index: 1;
+    animation: bspin 7s linear infinite;
   }
 
-  .shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.08) 50%,
-      transparent 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
+  /* Corner reticle ticks — the diagnostic-viewport motif. */
+  .reticle {
+    position: relative;
   }
-
-  .noise::after {
+  .reticle::before,
+  .reticle::after {
     content: "";
     position: absolute;
-    inset: 0;
+    width: 14px;
+    height: 14px;
     pointer-events: none;
-    opacity: 0.05;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+    opacity: 0.5;
+  }
+  .reticle::before {
+    top: 10px;
+    left: 10px;
+    border-top: 1px solid var(--accent);
+    border-left: 1px solid var(--accent);
+  }
+  .reticle::after {
+    bottom: 10px;
+    right: 10px;
+    border-bottom: 1px solid var(--accent);
+    border-right: 1px solid var(--accent);
+  }
+
+  /* Eyebrow label — mono, measured, the section index system. */
+  .eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--accent);
   }
 }
 
-/* gooey filter target */
-.goo {
-  filter: url(#liquid-goo);
-}
-
-/* hide native cursor on desktops where custom cursor is on */
-@media (hover: hover) and (pointer: fine) {
-  body.has-cursor,
-  body.has-cursor * {
-    cursor: none !important;
-  }
-  body.has-cursor a,
-  body.has-cursor button,
-  body.has-cursor [data-magnetic] {
-    cursor: none !important;
-  }
+/* Fine blueprint grid utility for section backdrops. */
+.grid-lines {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
 }
 
 /* anchor offset for fixed header */
 section[id] {
-  scroll-margin-top: 90px;
+  scroll-margin-top: 96px;
 }
 
-/* link reveal underline */
+/* link reveal underline — single accent */
 .link-fade {
   position: relative;
 }
@@ -176,26 +215,65 @@ section[id] {
   bottom: -2px;
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, #22d3ee, #a78bfa, #e879f9);
+  background: var(--accent);
   transform: scaleX(0);
   transform-origin: right;
-  transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1);
+  transition: transform 0.4s cubic-bezier(0.65, 0, 0.35, 1);
 }
 .link-fade:hover::after {
   transform: scaleX(1);
   transform-origin: left;
 }
 
-/* prevent flash on motion components */
 [data-mounted="false"] {
   opacity: 0;
 }
 
-@keyframes orbit {
-  from {
-    transform: rotate(0deg) translateX(var(--r, 120px)) rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg) translateX(var(--r, 120px)) rotate(-360deg);
+@keyframes scanline {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@keyframes sheen {
+  0% { background-position: 0% center; }
+  100% { background-position: 220% center; }
+}
+
+@keyframes bspin {
+  to { --bang: 360deg; }
+}
+
+/* drifting aurora layers */
+@keyframes aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(8%, 6%) scale(1.12); }
+  66% { transform: translate(-6%, -4%) scale(0.96); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-10%, 8%) scale(1.15); }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes grid-pan {
+  0% { background-position: 0 0; }
+  100% { background-position: 56px 56px; }
+}
+
+.animate-aurora-a { animation: aurora-a 24s ease-in-out infinite; }
+.animate-aurora-b { animation: aurora-b 30s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 50s linear infinite; }
+.animate-grid-pan { animation: grid-pan 8s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .accent-text,
+  .flow-border::after,
+  .animate-aurora-a,
+  .animate-aurora-b,
+  .animate-spin-slow,
+  .animate-grid-pan {
+    animation: none !important;
   }
 }

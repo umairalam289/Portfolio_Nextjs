@@ -93,13 +93,11 @@ export default function RetinaDemo() {
           className="mb-10 flex flex-wrap items-end justify-between gap-6"
         >
           <div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/45">
-              06 / Live demo
-            </div>
+            <div className="eyebrow">Live model 03 — Retinal vessels</div>
             <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-              Retinal vessels, <span className="gradient-text">traced</span>.
+              Retinal vessels, <span className="accent-text">traced</span>.
             </h2>
-            <p className="mt-4 max-w-2xl text-white/65">
+            <p className="mt-4 max-w-2xl leading-relaxed text-white/70">
               Semantic segmentation of retinal blood vessels from fundus photographs — a
               U-Net with a ResNet-34 backbone producing precise binary vessel maps for
               ophthalmology screening. Drag the handle to compare the input photograph
@@ -111,17 +109,20 @@ export default function RetinaDemo() {
         <div className="grid gap-6 lg:grid-cols-12">
           {/* comparison viewer */}
           <div className="lg:col-span-8">
-            <div className="glass relative overflow-hidden rounded-3xl">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-black/20 px-4 py-3 font-mono text-[11px] text-white/55">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex gap-1">
-                    <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300/70" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+            <div className="panel-solid relative overflow-hidden rounded-3xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 bg-black/30 px-4 py-3 font-mono text-[11px] text-white/55">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1.5 text-accent">
+                    <span className="relative inline-flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-70" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+                    </span>
+                    LIVE
                   </span>
-                  <span className="text-white/45">fundus · 512×512px · U-Net · ResNet-34</span>
+                  <span className="text-white/30">/</span>
+                  <span className="text-white/55">fundus · 512×512px · U-Net · ResNet-34</span>
                 </div>
-                <span className="hidden sm:inline text-white/35">
+                <span className="hidden sm:inline text-white/40">
                   {Math.round(pos)}% segmented
                 </span>
               </div>
@@ -239,7 +240,7 @@ export default function RetinaDemo() {
 
           {/* controls / details */}
           <aside className="lg:col-span-4">
-            <div className="glass space-y-5 rounded-3xl p-5">
+            <div className="panel space-y-5 rounded-3xl p-5">
               <div>
                 <h3 className="font-display text-lg font-semibold tracking-tight">Output mode</h3>
                 <div className="mt-3 grid grid-cols-2 gap-2">

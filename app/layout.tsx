@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Spectral, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 import LiquidBackground from "@/components/LiquidBackground";
-import CursorBlob from "@/components/CursorBlob";
 import Navbar from "@/components/Navbar";
+import FX from "@/components/FX";
 
-const inter = Inter({
+// Serif display + humanist sans + technical mono — a real contrast axis, and
+// off the saturated AI-portfolio reflex set.
+const display = Spectral({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
   display: "swap",
 });
-const space = Space_Grotesk({
+const sans = Hanken_Grotesk({
   subsets: ["latin"],
-  variable: "--font-space",
+  variable: "--font-sans",
   display: "swap",
 });
-const mono = JetBrains_Mono({
+const mono = Spline_Sans_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
@@ -40,10 +43,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${space.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="font-sans antialiased">
         <LiquidBackground />
-        <CursorBlob />
+        <FX />
         <Navbar />
         <main className="relative z-10">{children}</main>
       </body>
